@@ -1,0 +1,55 @@
+name: Diagnostic
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Repozitoriydagi fayllar
+        run: find . -not -path './.git/*' | sort
+
+      - name: Zip fayllar ichi
+        run: |
+          for z in ./*.zip; do
+            if [ -e "$z" ]; then
+              echo "--- $z"
+              unzip -l "$z"
+            fi
+          done
+          echo "Zip tekshiruvi tugadi"
+
+      - name: index.html qayerda
+        run: |
+          find . -name index.html -not -path './.git/*'
+          echo "Qidiruv tugadi"
+
+      - name: Workflow fayllari
+        run: |
+          for f in .github/workflows/*.yml; do
+            echo "--- $f"
+            cat "$f"
+          done
+
+      - name: Asboblar versiyasi
+        run: |
+          java -version 2>&1
+          node -v
+          npm -v
+          rsync --version | head -n1
+          unzip -v | head -n1
+
+      - name: Ilova versiyasini aniqlash
+        run: |
+          f=$(find . -name index.html -not -path './.git/*' -not -path '*/assets/*' | head -n1)
+          if [ -z "$f" ]; then
+            echo "XATO: repozitoriyda ochilgan index.html yo'q (zip ichida bo'lishi mumkin)"
+          elif grep -q "country=" "$f"; then
+            echo "ESKI versiya: $f (namoz vaqtlari ishlamaydi)"
+          else
+            echo "YANGI versiya: $f"
+          fi
