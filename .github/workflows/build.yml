@@ -1,0 +1,46 @@
+name: Build APK
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Sayt fayllarini topish va nusxalash
+        run: |
+          src=$(dirname "$(find . -name index.html -not -path './build_app/*' -not -path '*/node_modules/*' | head -n1)")
+          echo "Sayt papkasi: $src"
+          mkdir -p build_app/www
+          rsync -a --exclude='.git' --exclude='.github' --exclude='build_app' --exclude='*.zip' --exclude='README.md' "$src"/ build_app/www/
+          ls -la build_app/www
+          test -f build_app/www/index.html
+
+      - name: Android loyihani yaratish
+        working-directory: build_app
+        run: |
+          npm init -y
+          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+          npx cap init "Nur" "uz.nur.app" --web-dir www
+          npx cap add android
+
+      - name: APK yig'ish
+        working-directory: build_app/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Telefon-APK
+          path: build_app/android/app/build/outputs/apk/debug/app-debug.apk
