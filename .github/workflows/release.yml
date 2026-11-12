@@ -1,0 +1,40 @@
+name: Release Nur APK
+on:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.9
+      - name: Build
+        env:
+          KS_B64: ${{ secrets.KS_B64 }}
+          KS_PASS: ${{ secrets.KS_PASS }}
+        run: |
+          set +e
+          if [ -z "$KS_PASS" ] || [ -z "$KS_B64" ]; then echo "::error::KS_B64 va KS_PASS maxfiy qiymatlari qo'yilmagan"; exit 1; fi
+          for f in *; do
+            if [ -f "$f" ] && unzip -tq "$f" >/dev/null 2>&1; then unzip -qo "$f" -d proj; fi
+          done
+          if [ ! -f proj/settings.gradle.kts ]; then echo "::error::settings topilmadi. Fayllar: $(ls | tr '\n' ' ')"; exit 1; fi
+          echo "$KS_B64" | base64 -d > proj/release.keystore
+          cd proj
+          gradle assembleRelease --no-daemon > ../log.txt 2>&1
+          code=$?
+          if [ $code -ne 0 ]; then echo "::error::GRADLE xato kod $code: $(tail -n 25 ../log.txt | tr '\n' '|')"; exit $code; fi
+          cp app/build/outputs/apk/release/app-release.apk ../Nur.apk
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Nur (so'nggi versiya)
+          files: Nur.apk
